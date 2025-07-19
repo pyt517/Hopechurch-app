@@ -7,6 +7,10 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		65864B2B2E2C2D2C007C30C4 /* SupabaseService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65864B292E2C2D2C007C30C4 /* SupabaseService.swift */; };
+		65864B2C2E2C2D2C007C30C4 /* UsageSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65864B2A2E2C2D2C007C30C4 /* UsageSession.swift */; };
+		65864B2E2E2C3528007C30C4 /* Supabase-Keys.plist in Resources */ = {isa = PBXBuildFile; fileRef = 65864B2D2E2C3528007C30C4 /* Supabase-Keys.plist */; };
+		65864B322E2C3B03007C30C4 /* .gitignore in Resources */ = {isa = PBXBuildFile; fileRef = 65864B312E2C3B03007C30C4 /* .gitignore */; };
 		65EF4F102E26E1CF004B52E3 /* hopechurchApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65EF4F0F2E26E1CF004B52E3 /* hopechurchApp.swift */; };
 		65EF4F142E26E1D2004B52E3 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 65EF4F132E26E1D2004B52E3 /* Assets.xcassets */; };
 		65EF4F172E26E1D2004B52E3 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 65EF4F162E26E1D2004B52E3 /* Preview Assets.xcassets */; };
@@ -15,7 +19,7 @@
 		65EF4F2D2E26E1D3004B52E3 /* hopechurchUITestsLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65EF4F2C2E26E1D3004B52E3 /* hopechurchUITestsLaunchTests.swift */; };
 		65EF4F3C2E26E24E004B52E3 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65EF4F392E26E24D004B52E3 /* ContentView.swift */; };
 		65EF4F3D2E26E24E004B52E3 /* HistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65EF4F3A2E26E24E004B52E3 /* HistoryView.swift */; };
-		65EF4F3E2E26E24E004B52E3 /* CheckInEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65EF4F3B2E26E24E004B52E3 /* CheckInEvent.swift */; };
+		C1B4A7F92E5B9D8B004079A3 /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = C1B4A7F82E5B9D8B004079A3 /* Supabase */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -36,6 +40,10 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		65864B292E2C2D2C007C30C4 /* SupabaseService.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SupabaseService.swift; sourceTree = "<group>"; };
+		65864B2A2E2C2D2C007C30C4 /* UsageSession.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = UsageSession.swift; sourceTree = "<group>"; };
+		65864B2D2E2C3528007C30C4 /* Supabase-Keys.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Supabase-Keys.plist"; sourceTree = "<group>"; };
+		65864B312E2C3B03007C30C4 /* .gitignore */ = {isa = PBXFileReference; lastKnownFileType = text; path = .gitignore; sourceTree = "<group>"; };
 		65EF4F0C2E26E1CF004B52E3 /* hopechurch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = hopechurch.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		65EF4F0F2E26E1CF004B52E3 /* hopechurchApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = hopechurchApp.swift; sourceTree = "<group>"; };
 		65EF4F132E26E1D2004B52E3 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -47,7 +55,6 @@
 		65EF4F2C2E26E1D3004B52E3 /* hopechurchUITestsLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = hopechurchUITestsLaunchTests.swift; sourceTree = "<group>"; };
 		65EF4F392E26E24D004B52E3 /* ContentView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		65EF4F3A2E26E24E004B52E3 /* HistoryView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = HistoryView.swift; sourceTree = "<group>"; };
-		65EF4F3B2E26E24E004B52E3 /* CheckInEvent.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CheckInEvent.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -55,6 +62,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C1B4A7F92E5B9D8B004079A3 /* Supabase in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -78,6 +86,7 @@
 		65EF4F032E26E1CF004B52E3 = {
 			isa = PBXGroup;
 			children = (
+				65864B312E2C3B03007C30C4 /* .gitignore */,
 				65EF4F0E2E26E1CF004B52E3 /* hopechurch */,
 				65EF4F1F2E26E1D2004B52E3 /* hopechurchTests */,
 				65EF4F292E26E1D2004B52E3 /* hopechurchUITests */,
@@ -98,9 +107,11 @@
 		65EF4F0E2E26E1CF004B52E3 /* hopechurch */ = {
 			isa = PBXGroup;
 			children = (
-				65EF4F3B2E26E24E004B52E3 /* CheckInEvent.swift */,
+				65864B292E2C2D2C007C30C4 /* SupabaseService.swift */,
+				65864B2A2E2C2D2C007C30C4 /* UsageSession.swift */,
 				65EF4F392E26E24D004B52E3 /* ContentView.swift */,
 				65EF4F3A2E26E24E004B52E3 /* HistoryView.swift */,
+				65864B2D2E2C3528007C30C4 /* Supabase-Keys.plist */,
 				65EF4F0F2E26E1CF004B52E3 /* hopechurchApp.swift */,
 				65EF4F132E26E1D2004B52E3 /* Assets.xcassets */,
 				65EF4F152E26E1D2004B52E3 /* Preview Content */,
@@ -147,6 +158,7 @@
 			buildRules = (
 			);
 			dependencies = (
+				C1B4A7FA2E5B9D8B004079A3 /* PBXTargetDependency */,
 			);
 			name = hopechurch;
 			productName = hopechurch;
@@ -221,6 +233,9 @@
 				Base,
 			);
 			mainGroup = 65EF4F032E26E1CF004B52E3;
+			packageReferences = (
+				C1B4A7F72E5B9D8B004079A3 /* XCRemoteSwiftPackageReference "supabase-swift" */,
+			);
 			productRefGroup = 65EF4F0D2E26E1CF004B52E3 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -237,6 +252,8 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				65864B322E2C3B03007C30C4 /* .gitignore in Resources */,
+				65864B2E2E2C3528007C30C4 /* Supabase-Keys.plist in Resources */,
 				65EF4F172E26E1D2004B52E3 /* Preview Assets.xcassets in Resources */,
 				65EF4F142E26E1D2004B52E3 /* Assets.xcassets in Resources */,
 			);
@@ -263,8 +280,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				65EF4F3E2E26E24E004B52E3 /* CheckInEvent.swift in Sources */,
+				65864B2C2E2C2D2C007C30C4 /* UsageSession.swift in Sources */,
 				65EF4F3C2E26E24E004B52E3 /* ContentView.swift in Sources */,
+				65864B2B2E2C2D2C007C30C4 /* SupabaseService.swift in Sources */,
 				65EF4F3D2E26E24E004B52E3 /* HistoryView.swift in Sources */,
 				65EF4F102E26E1CF004B52E3 /* hopechurchApp.swift in Sources */,
 			);
@@ -299,6 +317,10 @@
 			isa = PBXTargetDependency;
 			target = 65EF4F0B2E26E1CF004B52E3 /* hopechurch */;
 			targetProxy = 65EF4F272E26E1D2004B52E3 /* PBXContainerItemProxy */;
+		};
+		C1B4A7FA2E5B9D8B004079A3 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			productRef = C1B4A7F82E5B9D8B004079A3 /* Supabase */;
 		};
 /* End PBXTargetDependency section */
 
@@ -596,6 +618,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		C1B4A7F72E5B9D8B004079A3 /* XCRemoteSwiftPackageReference "supabase-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/supabase/supabase-swift.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.0.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		C1B4A7F82E5B9D8B004079A3 /* Supabase */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C1B4A7F72E5B9D8B004079A3 /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Supabase;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 65EF4F042E26E1CF004B52E3 /* Project object */;
 }

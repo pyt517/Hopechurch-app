@@ -1,76 +1,43 @@
 import SwiftUI
 
 struct HistoryView: View {
-    @Binding var events: [CheckInEvent]
+    @Binding var sessions: [UsageSession]
     
     @Environment(\.presentationMode) var presentationMode
     @State private var selectedYear: Int? = Calendar.current.component(.year, from: Date())
     @State private var selectedMonth: Int? = Calendar.current.component(.month, from: Date())
-    @State private var sessionToDelete: CheckInSession?
+    @State private var sessionToDelete: UsageSession?
     @State private var showingDeleteAlert = false
 
-    struct CheckInSession: Identifiable {
-        let id: UUID
-        let enterEvent: CheckInEvent
-        let leaveEvent: CheckInEvent?
-        private let ratePerHour: Double = 10.0
-
-        var duration: TimeInterval? {
-            guard let leaveEvent = leaveEvent else { return nil }
-            return leaveEvent.date.timeIntervalSince(enterEvent.date)
-        }
-        
-        var cost: Double? {
-            guard let duration = duration else { return nil }
-            let hours = duration / 3600
-            return hours * ratePerHour
-        }
-    }
-    
     // --- COMPUTED PROPERTIES: DATA ---
-
-    private var sessions: [CheckInSession] {
-        var sessions: [CheckInSession] = []
-        var eventsCopy = events
-        while !eventsCopy.isEmpty {
-            let latestEvent = eventsCopy.removeFirst()
-            if latestEvent.type == .leave, let nextEvent = eventsCopy.first, nextEvent.type == .enter {
-                let enterEvent = eventsCopy.removeFirst()
-                sessions.append(CheckInSession(id: latestEvent.id, enterEvent: enterEvent, leaveEvent: latestEvent))
-            } else if latestEvent.type == .enter {
-                sessions.append(CheckInSession(id: latestEvent.id, enterEvent: latestEvent, leaveEvent: nil))
-            }
-        }
-        return sessions
-    }
 
     private var availableYears: [Int] {
         let currentYear = Calendar.current.component(.year, from: Date())
         return Array((currentYear - 4)...currentYear).sorted(by: >)
     }
 
-    private var availableMonthsForSelectedYear: [Int] {
+    private var availableMonths: [Int] {
         return Array(1...12)
     }
 
-    private var filteredSessions: [CheckInSession] {
+    private var filteredSessions: [UsageSession] {
         guard let year = selectedYear else { return sessions }
         let calendar = Calendar.current
         
         let yearFiltered = sessions.filter {
-            calendar.component(.year, from: $0.enterEvent.date) == year
+            calendar.component(.year, from: $0.arrive_at) == year
         }
         
         guard let month = selectedMonth else { return yearFiltered }
         
         return yearFiltered.filter {
-            calendar.component(.month, from: $0.enterEvent.date) == month
+            calendar.component(.month, from: $0.arrive_at) == month
         }
     }
     
-    private var sessionsGroupedByDay: [Date: [CheckInSession]] {
+    private var sessionsGroupedByDay: [Date: [UsageSession]] {
         Dictionary(grouping: filteredSessions) {
-            Calendar.current.startOfDay(for: $0.enterEvent.date)
+            Calendar.current.startOfDay(for: $0.arrive_at)
         }
     }
     
@@ -231,7 +198,7 @@ struct HistoryView: View {
     private func monthPicker() -> some View {
         Menu {
             Button("所有月份") { selectedMonth = nil }
-            ForEach(availableMonthsForSelectedYear, id: \.self) { month in
+            ForEach(availableMonths, id: \.self) { month in
                 Button(monthName(from: month)) { selectedMonth = month }
             }
         } label: {
@@ -313,11 +280,11 @@ struct HistoryView: View {
     }
 
     @ViewBuilder
-    private func sessionRowView(for session: CheckInSession) -> some View {
+    private func sessionRowView(for session: UsageSession) -> some View {
         HStack {
             VStack(alignment: .leading, spacing: 5) {
-                Text("进入: \(timeString(from: session.enterEvent.date))")
-                if let leaveDate = session.leaveEvent?.date {
+                Text("进入: \(timeString(from: session.arrive_at))")
+                if let leaveDate = session.leave_at {
                     Text("离开: \(timeString(from: leaveDate))")
                 } else {
                     Text("离开: 进行中...")
@@ -340,9 +307,19 @@ struct HistoryView: View {
     
     // --- HELPERS ---
 
-    private func delete(session: CheckInSession) {
-        events.removeAll { $0.id == session.enterEvent.id || $0.id == session.leaveEvent?.id }
-        CheckInEventStorage.save(events)
+    private func delete(session: UsageSession) {
+        // Optimistically remove from local state
+        sessions.removeAll { $0.id == session.id }
+        
+        // Call Supabase to delete from the backend
+        Task {
+            do {
+                try await SupabaseService.shared.deleteSession(id: session.id)
+            } catch {
+                print("Error deleting session: \(error)")
+                // Handle error (e.g., re-fetch data or show an alert)
+            }
+        }
     }
     
     private func monthName(from month: Int) -> String {

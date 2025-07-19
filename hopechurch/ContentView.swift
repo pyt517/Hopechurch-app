@@ -1,17 +1,15 @@
 import SwiftUI
 
 struct ContentView: View {
-    @State private var events: [CheckInEvent] = CheckInEventStorage.load()
+    @State private var sessions: [UsageSession] = []
     @State private var showAlert = false
     @State private var alertTitle = ""
     @State private var alertMessage = ""
     @State private var showingManualEntry = false
     
+    /// The user can "Enter" if there is no currently active session (no session with a nil `leave_at`).
     private var canEnter: Bool {
-        if let lastEvent = events.first {
-            return lastEvent.type == .leave
-        }
-        return true
+        !sessions.contains { $0.leave_at == nil }
     }
     
     var body: some View {
@@ -27,14 +25,12 @@ struct ContentView: View {
                 
                 // Content Layer
                 VStack(spacing: 0) {
-                    // Title
-                    Text("HopeChurch Record")
-                        .font(.system(size: 40, weight: .bold, design: .rounded))
-                        .foregroundColor(.white)
-                        .shadow(color: .black.opacity(0.4), radius: 5, y: 3)
-                    
                     // Header
                     VStack(alignment: .leading) {
+                        Text("HopeChurch")
+                            .font(.system(size: 34, weight: .bold))
+                            .foregroundColor(.white)
+                        
                         Text("随时记录您的到来")
                             .font(.system(size: 18))
                             .foregroundColor(.white.opacity(0.8))
@@ -52,7 +48,7 @@ struct ContentView: View {
                             title: "进入",
                             icon: "arrow.right.to.line",
                             backgroundColor: Color(red: 252/255, green: 122/255, blue: 87/255),
-                            action: { addEvent(type: .enter) },
+                            action: handleEnter,
                             disabled: !canEnter
                         )
                         
@@ -60,7 +56,7 @@ struct ContentView: View {
                             title: "离开",
                             icon: "arrow.left.to.line",
                             backgroundColor: Color(red: 88/255, green: 86/255, blue: 214/255),
-                            action: { addEvent(type: .leave) },
+                            action: handleLeave,
                             disabled: canEnter
                         )
                     }
@@ -89,7 +85,7 @@ struct ContentView: View {
                             }
                         }
                         
-                        NavigationLink(destination: HistoryView(events: $events)) {
+                        NavigationLink(destination: HistoryView(sessions: $sessions)) {
                            VStack(spacing: 5) {
                                 Image(systemName: "clock.fill")
                                     .font(.system(size: 22))
@@ -106,11 +102,15 @@ struct ContentView: View {
             }
             .navigationBarHidden(true)
             .sheet(isPresented: $showingManualEntry) {
-                ManualEntryView(events: $events)
+                ManualEntryView(onSave: {
+                    // Refresh data after manual entry
+                    loadInitialData()
+                })
             }
             .alert(isPresented: $showAlert) {
                 Alert(title: Text(alertTitle), message: Text(alertMessage), dismissButton: .default(Text("好的")))
             }
+            .onAppear(perform: loadInitialData)
         }
         .navigationViewStyle(.stack)
     }
@@ -137,62 +137,84 @@ struct ContentView: View {
         .animation(.easeInOut, value: disabled)
     }
     
-    func addEvent(type: CheckInType) {
-        let event = CheckInEvent(type: type)
-        events.insert(event, at: 0)
-        CheckInEventStorage.save(events)
-        
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
-        let dateString = formatter.string(from: event.date)
-        
-        if type == .enter {
-            alertTitle = "记录成功"
-            alertMessage = "时间: \(dateString)"
-        } else {
-            alertTitle = "再见！"
-            alertMessage = "时间: \(dateString)"
-        }
-        showAlert = true
-    }
-}
+    // --- Data Handlers ---
 
-struct CheckInEventStorage {
-    static let key = "CheckInEvents"
-    static func load() -> [CheckInEvent] {
-        guard let data = UserDefaults.standard.data(forKey: key) else { return [] }
-        return (try? JSONDecoder().decode([CheckInEvent].self, from: data)) ?? []
+    private func loadInitialData() {
+        Task {
+            do {
+                sessions = try await SupabaseService.shared.fetchSessions()
+            } catch {
+                print("Error loading sessions: \(error)")
+                // Handle error appropriately
+            }
+        }
     }
-    static func save(_ events: [CheckInEvent]) {
-        if let data = try? JSONEncoder().encode(events) {
-            UserDefaults.standard.set(data, forKey: key)
+    
+    private func handleEnter() {
+        Task {
+            do {
+                let newSession = try await SupabaseService.shared.startNewSession()
+                sessions.insert(newSession, at: 0)
+                
+                let formatter = DateFormatter()
+                formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+                alertTitle = "记录成功"
+                alertMessage = "时间: \(formatter.string(from: newSession.arrive_at))"
+                showAlert = true
+                
+            } catch {
+                print("Error starting session: \(error)")
+                // Handle error
+            }
+        }
+    }
+    
+    private func handleLeave() {
+        Task {
+            do {
+                if let updatedSession = try await SupabaseService.shared.endCurrentSession() {
+                    // Find and update the session in the local array
+                    if let index = sessions.firstIndex(where: { $0.id == updatedSession.id }) {
+                        sessions[index] = updatedSession
+                    }
+                    
+                    let formatter = DateFormatter()
+                    formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+                    alertTitle = "再见！"
+                    alertMessage = "时间: \(formatter.string(from: updatedSession.leave_at ?? Date()))"
+                    showAlert = true
+                }
+            } catch {
+                print("Error ending session: \(error)")
+                // Handle error
+            }
         }
     }
 }
 
 struct ManualEntryView: View {
-    @Binding var events: [CheckInEvent]
+    var onSave: () -> Void
     @Environment(\.presentationMode) var presentationMode
     
-    @State private var enterDate = Date()
+    @State private var arriveDate = Date()
     @State private var leaveDate = Date()
     @State private var showingAlert = false
     
     private var isSaveDisabled: Bool {
-        leaveDate <= enterDate
+        leaveDate <= arriveDate
     }
 
     var body: some View {
         NavigationView {
             Form {
                 Section(header: Text("输入时间")) {
-                    DatePicker("进入时间", selection: $enterDate)
+                    DatePicker("进入时间", selection: $arriveDate)
                     DatePicker("离开时间", selection: $leaveDate)
                 }
                 
                 Section {
                     Button("保存") {
-                        saveEvents()
+                        saveSession()
                     }
                     .disabled(isSaveDisabled)
                 }
@@ -209,27 +231,27 @@ struct ManualEntryView: View {
                 )
             }
             .onAppear {
-                // Set a sensible default for leave date
-                leaveDate = Calendar.current.date(byAdding: .hour, value: 1, to: enterDate) ?? Date()
+                leaveDate = Calendar.current.date(byAdding: .hour, value: 1, to: arriveDate) ?? Date()
             }
         }
     }
     
-    private func saveEvents() {
+    private func saveSession() {
         guard !isSaveDisabled else {
             showingAlert = true
             return
         }
         
-        let enterEvent = CheckInEvent(type: .enter, date: enterDate)
-        let leaveEvent = CheckInEvent(type: .leave, date: leaveDate)
-        
-        // Add new events and sort the entire list to maintain chronological order
-        events.append(enterEvent)
-        events.append(leaveEvent)
-        events.sort { $0.date > $1.date }
-        
-        CheckInEventStorage.save(events)
-        presentationMode.wrappedValue.dismiss()
+        Task {
+            do {
+                try await SupabaseService.shared.addManualSession(arriveAt: arriveDate, leaveAt: leaveDate)
+                // Call the onSave closure to trigger a refresh on the ContentView
+                onSave()
+                presentationMode.wrappedValue.dismiss()
+            } catch {
+                print("Error saving manual session: \(error)")
+                // Handle error appropriately
+            }
+        }
     }
 } 
