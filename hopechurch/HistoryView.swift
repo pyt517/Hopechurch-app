@@ -46,12 +46,35 @@ struct HistoryView: View {
     }
 
     private var totalStatistics: (label: String, duration: String, cost: String)? {
-        let totalDuration = filteredSessions.reduce(0) { $0 + ($1.duration ?? 0) }
-        guard totalDuration > 0 else { return nil }
+        let totalDurationSeconds = filteredSessions.reduce(0) { $0 + ($1.duration ?? 0) }
+        guard totalDurationSeconds > 0 else { return nil }
         
-        let totalCost = filteredSessions.reduce(0) { $0 + ($1.cost ?? 0) }
+        // --- Corrected Billing Logic ---
+        let totalMinutes = totalDurationSeconds / 60
         
-        let formattedDuration = formatDuration(totalDuration)
+        let fullHours = floor(totalMinutes / 60)
+        let remainingMinutes = totalMinutes.truncatingRemainder(dividingBy: 60)
+        
+        var roundedRemainderMinutes: Double = 0
+        if remainingMinutes > 0 {
+            if remainingMinutes <= 15 {
+                roundedRemainderMinutes = 15
+            } else if remainingMinutes <= 30 {
+                roundedRemainderMinutes = 30
+            } else if remainingMinutes <= 45 {
+                roundedRemainderMinutes = 45
+            } else { // remainingMinutes is > 45 and < 60
+                roundedRemainderMinutes = 60
+            }
+        }
+        
+        let billableMinutes = (fullHours * 60) + roundedRemainderMinutes
+        let billableDurationSeconds = billableMinutes * 60
+        let billableHours = billableMinutes / 60
+        let totalCost = billableHours * 10.0 // Assuming rate is $10/hr
+        // --- End of Corrected Logic ---
+        
+        let formattedDuration = formatDuration(billableDurationSeconds)
         let formattedCost = formatCurrency(totalCost)
         
         let label: String
@@ -306,7 +329,7 @@ struct HistoryView: View {
     }
     
     // --- HELPERS ---
-
+    
     private func delete(session: UsageSession) {
         // Optimistically remove from local state
         sessions.removeAll { $0.id == session.id }
@@ -337,10 +360,19 @@ struct HistoryView: View {
     }
     
     private func formatDuration(_ duration: TimeInterval) -> String {
-        let formatter = DateComponentsFormatter()
-        formatter.unitsStyle = .abbreviated
-        formatter.allowedUnits = [.hour, .minute]
-        return formatter.string(from: duration) ?? ""
+        guard duration >= 60 else { return "少于一分钟" }
+        
+        let totalMinutes = Int(duration / 60)
+        let hours = totalMinutes / 60
+        let minutes = totalMinutes % 60
+        
+        if hours > 0 && minutes > 0 {
+            return "\(hours)小时\(minutes)分钟"
+        } else if hours > 0 {
+            return "\(hours)小时"
+        } else {
+            return "\(minutes)分钟"
+        }
     }
     
     private func formatCurrency(_ amount: Double) -> String {

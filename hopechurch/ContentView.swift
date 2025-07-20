@@ -75,7 +75,10 @@ struct ContentView: View {
 
                     // Bottom Navigation
                     HStack(spacing: 70) {
-                         Button(action: { showingManualEntry = true }) {
+                         NavigationLink(destination: ManualEntryView(onSave: {
+                            // Refresh data after manual entry
+                            loadInitialData()
+                         })) {
                             VStack(spacing: 5) {
                                 Image(systemName: "square.and.pencil")
                                     .font(.system(size: 22))
@@ -101,12 +104,6 @@ struct ContentView: View {
                 .padding(.top, 40)
             }
             .navigationBarHidden(true)
-            .sheet(isPresented: $showingManualEntry) {
-                ManualEntryView(onSave: {
-                    // Refresh data after manual entry
-                    loadInitialData()
-                })
-            }
             .alert(isPresented: $showAlert) {
                 Alert(title: Text(alertTitle), message: Text(alertMessage), dismissButton: .default(Text("好的")))
             }
@@ -196,46 +193,142 @@ struct ManualEntryView: View {
     var onSave: () -> Void
     @Environment(\.presentationMode) var presentationMode
     
-    @State private var arriveDate = Date()
-    @State private var leaveDate = Date()
+    @State private var arriveDateComponent = Date()
+    @State private var arriveTimeComponent = Date()
+    @State private var leaveDateComponent = Date()
+    @State private var leaveTimeComponent = Date()
+    
     @State private var showingAlert = false
+    
+    private var arriveDate: Date {
+        combine(date: arriveDateComponent, time: arriveTimeComponent)
+    }
+    
+    private var leaveDate: Date {
+        combine(date: leaveDateComponent, time: leaveTimeComponent)
+    }
     
     private var isSaveDisabled: Bool {
         leaveDate <= arriveDate
     }
 
     var body: some View {
-        NavigationView {
-            Form {
-                Section(header: Text("输入时间")) {
-                    DatePicker("进入时间", selection: $arriveDate)
-                    DatePicker("离开时间", selection: $leaveDate)
-                }
-                
-                Section {
-                    Button("保存") {
-                        saveSession()
+        ZStack {
+            // Background Layer
+            VStack(spacing: 0) {
+                Color(red: 28/255, green: 62/255, blue: 51/255)
+                    .frame(height: 150)
+                Color(red: 242/255, green: 242/255, blue: 247/255)
+            }
+            .edgesIgnoringSafeArea(.all)
+            
+            // Content Layer
+            VStack(alignment: .leading, spacing: 0) {
+                customNavBar()
+
+                ScrollView {
+                    VStack(spacing: 20) {
+                        // Entry Time Card
+                        VStack(alignment: .leading) {
+                            Text("进入时间")
+                                .font(.headline)
+                                .padding([.top, .horizontal])
+                            Divider().padding(.horizontal)
+                            DatePicker("日期", selection: $arriveDateComponent, displayedComponents: .date)
+                                .padding([.horizontal])
+                            DatePicker("时间", selection: $arriveTimeComponent, displayedComponents: .hourAndMinute)
+                                .padding([.horizontal, .bottom])
+                        }
+                        .background(Color.white)
+                        .cornerRadius(20)
+
+                        // Exit Time Card
+                        VStack(alignment: .leading) {
+                            Text("离开时间")
+                                .font(.headline)
+                                .padding([.top, .horizontal])
+                            Divider().padding(.horizontal)
+                            DatePicker("日期", selection: $leaveDateComponent, displayedComponents: .date)
+                                .padding([.horizontal])
+                            DatePicker("时间", selection: $leaveTimeComponent, displayedComponents: .hourAndMinute)
+                                .padding([.horizontal, .bottom])
+                        }
+                        .background(Color.white)
+                        .cornerRadius(20)
+                        
+                        // Save Button
+                        Button(action: saveSession) {
+                            Text("保存记录")
+                                .font(.headline)
+                                .fontWeight(.bold)
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.large)
+                        .tint(Color(red: 28/255, green: 62/255, blue: 51/255))
+                        .disabled(isSaveDisabled)
                     }
-                    .disabled(isSaveDisabled)
+                    .padding()
                 }
-            }
-            .navigationBarTitle("手动补卡", displayMode: .inline)
-            .navigationBarItems(leading: Button("取消") {
-                presentationMode.wrappedValue.dismiss()
-            })
-            .alert(isPresented: $showingAlert) {
-                Alert(
-                    title: Text("时间错误"),
-                    message: Text("离开时间必须晚于进入时间。"),
-                    dismissButton: .default(Text("好的"))
-                )
-            }
-            .onAppear {
-                leaveDate = Calendar.current.date(byAdding: .hour, value: 1, to: arriveDate) ?? Date()
             }
         }
+        .navigationBarHidden(true)
+        .alert(isPresented: $showingAlert) {
+            Alert(
+                title: Text("时间错误"),
+                message: Text("离开时间必须晚于进入时间。"),
+                dismissButton: .default(Text("好的"))
+            )
+        }
+        .onAppear(perform: setupDefaultDates)
     }
     
+    @ViewBuilder
+    private func customNavBar() -> some View {
+        HStack {
+            Button(action: {
+                presentationMode.wrappedValue.dismiss()
+            }) {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 22, weight: .semibold))
+                    .foregroundColor(.white)
+            }
+            Spacer()
+            Text("手动补卡")
+                .font(.system(size: 20, weight: .bold))
+                .foregroundColor(.white)
+            Spacer()
+            Image(systemName: "chevron.left").opacity(0)
+        }
+        .padding(.horizontal)
+        .padding(.top, 20)
+        .padding(.bottom, 10)
+    }
+
+    private func setupDefaultDates() {
+        let now = Date()
+        arriveDateComponent = now
+        arriveTimeComponent = now
+        leaveDateComponent = now
+        leaveTimeComponent = Calendar.current.date(byAdding: .hour, value: 1, to: now) ?? now
+    }
+    
+    private func combine(date: Date, time: Date) -> Date {
+        let calendar = Calendar.current
+        let dateComponents = calendar.dateComponents([.year, .month, .day], from: date)
+        let timeComponents = calendar.dateComponents([.hour, .minute, .second], from: time)
+        
+        var combinedComponents = DateComponents()
+        combinedComponents.year = dateComponents.year
+        combinedComponents.month = dateComponents.month
+        combinedComponents.day = dateComponents.day
+        combinedComponents.hour = timeComponents.hour
+        combinedComponents.minute = timeComponents.minute
+        combinedComponents.second = timeComponents.second
+        
+        return calendar.date(from: combinedComponents) ?? Date()
+    }
+
     private func saveSession() {
         guard !isSaveDisabled else {
             showingAlert = true
@@ -253,5 +346,11 @@ struct ManualEntryView: View {
                 // Handle error appropriately
             }
         }
+    }
+    
+    private var dateTimeFormatter: DateFormatter {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy年M月d日 HH:mm"
+        return formatter
     }
 } 
