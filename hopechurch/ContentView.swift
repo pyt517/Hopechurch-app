@@ -191,14 +191,17 @@ struct ContentView: View {
 
 struct ManualEntryView: View {
     var onSave: () -> Void
-    @Environment(\.presentationMode) var presentationMode
+    @Environment(\.dismiss) var dismiss
     
     @State private var arriveDateComponent = Date()
     @State private var arriveTimeComponent = Date()
     @State private var leaveDateComponent = Date()
     @State private var leaveTimeComponent = Date()
     
-    @State private var showingAlert = false
+    @State private var isAlertPresented = false
+    @State private var alertTitle = ""
+    @State private var alertMessage = ""
+    @State private var alertDismissAction: (() -> Void)? = nil
     
     private var arriveDate: Date {
         combine(date: arriveDateComponent, time: arriveTimeComponent)
@@ -273,11 +276,13 @@ struct ManualEntryView: View {
             }
         }
         .navigationBarHidden(true)
-        .alert(isPresented: $showingAlert) {
+        .alert(isPresented: $isAlertPresented) {
             Alert(
-                title: Text("时间错误"),
-                message: Text("离开时间必须晚于进入时间。"),
-                dismissButton: .default(Text("好的"))
+                title: Text(alertTitle),
+                message: Text(alertMessage),
+                dismissButton: .default(Text("好的"), action: {
+                    alertDismissAction?()
+                })
             )
         }
         .onAppear(perform: setupDefaultDates)
@@ -287,7 +292,7 @@ struct ManualEntryView: View {
     private func customNavBar() -> some View {
         HStack {
             Button(action: {
-                presentationMode.wrappedValue.dismiss()
+                dismiss()
             }) {
                 Image(systemName: "chevron.left")
                     .font(.system(size: 22, weight: .semibold))
@@ -331,19 +336,33 @@ struct ManualEntryView: View {
 
     private func saveSession() {
         guard !isSaveDisabled else {
-            showingAlert = true
+            self.alertTitle = "时间错误"
+            self.alertMessage = "离开时间必须晚于进入时间。"
+            self.alertDismissAction = nil
+            self.isAlertPresented = true
             return
         }
         
         Task {
             do {
                 try await SupabaseService.shared.addManualSession(arriveAt: arriveDate, leaveAt: leaveDate)
-                // Call the onSave closure to trigger a refresh on the ContentView
-                onSave()
-                presentationMode.wrappedValue.dismiss()
+                await MainActor.run {
+                    onSave()
+                    self.alertTitle = "保存成功"
+                    self.alertMessage = "您的补卡记录已成功添加。"
+                    self.alertDismissAction = {
+                        dismiss()
+                    }
+                    self.isAlertPresented = true
+                }
             } catch {
+                await MainActor.run {
+                    self.alertTitle = "保存失败"
+                    self.alertMessage = "网络请求失败，请稍后重试。"
+                    self.alertDismissAction = nil
+                    self.isAlertPresented = true
+                }
                 print("Error saving manual session: \(error)")
-                // Handle error appropriately
             }
         }
     }
