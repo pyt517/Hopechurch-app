@@ -8,6 +8,9 @@ struct HistoryView: View {
     @State private var selectedMonth: Int? = Calendar.current.component(.month, from: Date())
     @State private var sessionToDelete: UsageSession?
     @State private var showingDeleteAlert = false
+    @State private var showingShareSheet = false
+    @State private var reportImage: UIImage?
+
 
     // --- COMPUTED PROPERTIES: DATA ---
 
@@ -88,6 +91,29 @@ struct HistoryView: View {
         
         return (label: label, duration: formattedDuration, cost: formattedCost)
     }
+
+    private var totalDurationInSeconds: TimeInterval {
+        let totalDurationSeconds = filteredSessions.reduce(0) { $0 + ($1.duration ?? 0) }
+        let totalMinutes = totalDurationSeconds / 60
+        let fullHours = floor(totalMinutes / 60)
+        let remainingMinutes = totalMinutes.truncatingRemainder(dividingBy: 60)
+        
+        var roundedRemainderMinutes: Double = 0
+        if remainingMinutes > 0 {
+            if remainingMinutes <= 15 {
+                roundedRemainderMinutes = 15
+            } else if remainingMinutes <= 30 {
+                roundedRemainderMinutes = 30
+            } else if remainingMinutes <= 45 {
+                roundedRemainderMinutes = 45
+            } else {
+                roundedRemainderMinutes = 60
+            }
+        }
+        
+        let billableMinutes = (fullHours * 60) + roundedRemainderMinutes
+        return billableMinutes * 60
+    }
     
     // --- BODY ---
     
@@ -139,6 +165,16 @@ struct HistoryView: View {
         } message: { _ in
             Text("您确定要删除这条使用记录吗？")
         }
+        .sheet(isPresented: $showingShareSheet) {
+            if let image = reportImage {
+                ShareSheet(activityItems: [image])
+            }
+        }
+        .onChange(of: reportImage) { newImage in
+             if newImage != nil {
+                 showingShareSheet = true
+             }
+         }
     }
 
     // --- VIEW BUILDERS ---
@@ -247,6 +283,18 @@ struct HistoryView: View {
             Text("\(stats.label)统计")
                 .font(.title2)
                 .fontWeight(.bold)
+
+            if selectedMonth != nil && selectedYear != nil && !filteredSessions.isEmpty {
+                Button(action: exportToImage) {
+                    HStack {
+                        Image(systemName: "square.and.arrow.up")
+                        Text("导出为图片")
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .tint(.white.opacity(0.8))
+            }
             
             HStack {
                 Image(systemName: "hourglass")
@@ -265,14 +313,9 @@ struct HistoryView: View {
                     .fontWeight(.bold)
             }
         }
+        .foregroundColor(.white)
         .padding()
-        .background(
-            LinearGradient(
-                gradient: Gradient(colors: [Color(red: 88/255, green: 86/255, blue: 214/255), Color(red: 120/255, green: 120/255, blue: 220/255)]),
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        )
+        .background(Color(red: 91/255, green: 157/255, blue: 50/255))
         .cornerRadius(20)
     }
 
@@ -330,6 +373,29 @@ struct HistoryView: View {
     
     // --- HELPERS ---
     
+    @MainActor
+    private func exportToImage() {
+        guard let year = selectedYear, let month = selectedMonth, let stats = totalStatistics else { return }
+        
+        let reportView = ReportView(
+            month: month,
+            year: year,
+            sessions: filteredSessions,
+            totalDuration: totalDurationInSeconds,
+            totalCost: stats.cost
+        )
+        
+        let renderer = ImageRenderer(content: reportView)
+        renderer.scale = 2.0
+        
+        // Asynchronous rendering
+        Task {
+            if let image = await renderer.uiImage {
+                self.reportImage = image
+            }
+        }
+    }
+    
     private func delete(session: UsageSession) {
         // Optimistically remove from local state
         sessions.removeAll { $0.id == session.id }
@@ -381,4 +447,16 @@ struct HistoryView: View {
         formatter.locale = Locale(identifier: "en_CA")
         return formatter.string(from: NSNumber(value: amount)) ?? "$0.00"
     }
+}
+
+struct ShareSheet: UIViewControllerRepresentable {
+    var activityItems: [Any]
+    var applicationActivities: [UIActivity]? = nil
+
+    func makeUIViewController(context: UIViewControllerRepresentableContext<ShareSheet>) -> UIActivityViewController {
+        let controller = UIActivityViewController(activityItems: activityItems, applicationActivities: applicationActivities)
+        return controller
+    }
+
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: UIViewControllerRepresentableContext<ShareSheet>) {}
 } 

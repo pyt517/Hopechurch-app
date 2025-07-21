@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		654994D52E2DF2B9007ADF98 /* ReportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 654994D42E2DF2B8007ADF98 /* ReportView.swift */; };
 		65864B2B2E2C2D2C007C30C4 /* SupabaseService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65864B292E2C2D2C007C30C4 /* SupabaseService.swift */; };
 		65864B2C2E2C2D2C007C30C4 /* UsageSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65864B2A2E2C2D2C007C30C4 /* UsageSession.swift */; };
 		65864B2E2E2C3528007C30C4 /* Supabase-Keys.plist in Resources */ = {isa = PBXBuildFile; fileRef = 65864B2D2E2C3528007C30C4 /* Supabase-Keys.plist */; };
@@ -40,6 +41,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		654994D42E2DF2B8007ADF98 /* ReportView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ReportView.swift; sourceTree = "<group>"; };
 		65864B292E2C2D2C007C30C4 /* SupabaseService.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SupabaseService.swift; sourceTree = "<group>"; };
 		65864B2A2E2C2D2C007C30C4 /* UsageSession.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = UsageSession.swift; sourceTree = "<group>"; };
 		65864B2D2E2C3528007C30C4 /* Supabase-Keys.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Supabase-Keys.plist"; sourceTree = "<group>"; };
@@ -108,6 +110,7 @@
 			isa = PBXGroup;
 			children = (
 				65864B292E2C2D2C007C30C4 /* SupabaseService.swift */,
+				654994D42E2DF2B8007ADF98 /* ReportView.swift */,
 				65864B2A2E2C2D2C007C30C4 /* UsageSession.swift */,
 				65EF4F392E26E24D004B52E3 /* ContentView.swift */,
 				65EF4F3A2E26E24E004B52E3 /* HistoryView.swift */,
@@ -282,6 +285,7 @@
 			files = (
 				65864B2C2E2C2D2C007C30C4 /* UsageSession.swift in Sources */,
 				65EF4F3C2E26E24E004B52E3 /* ContentView.swift in Sources */,
+				654994D52E2DF2B9007ADF98 /* ReportView.swift in Sources */,
 				65864B2B2E2C2D2C007C30C4 /* SupabaseService.swift in Sources */,
 				65EF4F3D2E26E24E004B52E3 /* HistoryView.swift in Sources */,
 				65EF4F102E26E1CF004B52E3 /* hopechurchApp.swift in Sources */,
