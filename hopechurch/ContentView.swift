@@ -13,7 +13,7 @@ struct ContentView: View {
     }
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ZStack {
                 // Background Layer
                 VStack(spacing: 0) {
@@ -21,7 +21,7 @@ struct ContentView: View {
                         .frame(height: UIScreen.main.bounds.height * 0.35)
                     Color(red: 242/255, green: 242/255, blue: 247/255) // Light Gray Body
                 }
-                .edgesIgnoringSafeArea(.all)
+                .ignoresSafeArea()
                 
                 // Content Layer
                 VStack(spacing: 0) {
@@ -61,55 +61,55 @@ struct ContentView: View {
                         )
                     }
                     .padding(30)
-                    .background(
-                        RoundedRectangle(cornerRadius: 30)
-                            .fill(Color.white)
-                            .shadow(color: .black.opacity(0.1), radius: 20, x: 0, y: 5)
-                    )
+                    .background(Color.white)
+                    .cornerRadius(30)
+                    .shadow(color: .black.opacity(0.1), radius: 20, x: 0, y: 5)
                     .padding(.horizontal, 20)
-                    .offset(y: -UIScreen.main.bounds.height * 0.05)
+                    .offset(y: -40) // 用固定偏移，避免屏幕高度依赖
 
                     // Spacer to push bottom navigation down
                     Spacer()
                     Spacer()
 
                     // Bottom Navigation
-                    HStack(spacing: 70) {
-                         NavigationLink(destination: ManualEntryView(onSave: {
-                            // Refresh data after manual entry
+                    HStack {
+                        NavigationLink(destination: ManualEntryView(onSave: {
                             loadInitialData()
-                         })) {
-                            VStack(spacing: 5) {
+                        })) {
+                            VStack(spacing: 2) {
                                 Image(systemName: "square.and.pencil")
                                     .font(.system(size: 22))
                                 Text("手动补卡")
                                     .font(.footnote)
                                     .fontWeight(.medium)
                             }
+                            .frame(maxWidth: .infinity)
                         }
-                        
                         NavigationLink(destination: HistoryView(sessions: $sessions)) {
-                           VStack(spacing: 5) {
+                            VStack(spacing: 2) {
                                 Image(systemName: "clock.fill")
                                     .font(.system(size: 22))
                                 Text("查看历史")
                                     .font(.footnote)
                                     .fontWeight(.medium)
                             }
+                            .frame(maxWidth: .infinity)
                         }
                     }
+                    .frame(maxWidth: .infinity, minHeight: 56)
+                    .background(Color.white)
                     .foregroundColor(Color(red: 28/255, green: 62/255, blue: 51/255))
-                    .padding(.bottom, 20)
+                    .ignoresSafeArea(edges: .bottom)
                 }
                 .padding(.top, 40)
             }
-            .navigationBarHidden(true)
+            .toolbar(.hidden, for: .navigationBar)
             .alert(isPresented: $showAlert) {
                 Alert(title: Text(alertTitle), message: Text(alertMessage), dismissButton: .default(Text("好的")))
             }
             .onAppear(perform: loadInitialData)
         }
-        .navigationViewStyle(.stack)
+        .navigationViewStyle(.stack) // 可选，NavigationStack下可移除
     }
     
     // Custom Action Button

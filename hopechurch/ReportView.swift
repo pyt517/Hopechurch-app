@@ -22,34 +22,33 @@ struct ReportView: View {
                 .font(.largeTitle.bold())
                 .foregroundColor(.black)
             Text("\(monthName) \(String(year))")
-                .font(.title2)
-                .foregroundColor(.gray)
+                .font(.title2.bold())
+                .foregroundColor(.black)
+                .frame(maxWidth: .infinity, alignment: .center)
             
             Divider()
             
             // Column Headers
-            HStack {
-                Text("Date").fontWeight(.bold)
-                Spacer()
-                Text("Arrive").fontWeight(.bold)
-                Spacer()
-                Text("Leave").fontWeight(.bold)
-                Spacer()
-                Text("Duration").fontWeight(.bold)
+            HStack(spacing: 0) {
+                Text("Date").fontWeight(.bold).frame(maxWidth: .infinity, alignment: .leading)
+                Text("Arrive").fontWeight(.bold).frame(maxWidth: .infinity, alignment: .leading)
+                Text("Leave").fontWeight(.bold).frame(maxWidth: .infinity, alignment: .leading)
+                Text("Duration").fontWeight(.bold).frame(maxWidth: .infinity, alignment: .leading)
             }
             .font(.headline)
             .foregroundColor(.black)
 
             // Session Rows
             ForEach(sessions) { session in
-                HStack {
+                HStack(spacing: 0) {
                     Text(session.arrive_at, formatter: Self.dateFormatter)
-                    Spacer()
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     Text(session.arrive_at, formatter: Self.timeFormatter)
-                    Spacer()
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     Text(session.leave_at ?? Date(), formatter: Self.timeFormatter)
-                    Spacer()
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     Text(formatDuration(session.duration ?? 0))
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .font(.body)
                 .foregroundColor(.black)

@@ -10,6 +10,7 @@ struct HistoryView: View {
     @State private var showingDeleteAlert = false
     @State private var showingShareSheet = false
     @State private var reportImage: UIImage?
+    @State private var longPressedSessionId: Int? = nil
 
 
     // --- COMPUTED PROPERTIES: DATA ---
@@ -125,7 +126,7 @@ struct HistoryView: View {
                     .frame(height: 150)
                 Color(red: 242/255, green: 242/255, blue: 247/255) // Light Gray Body
             }
-            .edgesIgnoringSafeArea(.all)
+            .ignoresSafeArea()
 
             // Content Layer
             VStack(alignment: .leading, spacing: 0) {
@@ -146,6 +147,7 @@ struct HistoryView: View {
                                 .frame(maxWidth: .infinity)
                                 .background(Color.white)
                                 .cornerRadius(12)
+                                .shadow(color: .black.opacity(0.05), radius: 6, x: 0, y: 2)
                         } else {
                             ForEach(sortedDays, id: \.self) { day in
                                 dailySessionCard(day: day)
@@ -156,7 +158,7 @@ struct HistoryView: View {
                 }
             }
         }
-        .navigationBarHidden(true)
+        .toolbar(.hidden, for: .navigationBar)
         .alert("确认删除", isPresented: $showingDeleteAlert, presenting: sessionToDelete) { session in
             Button("删除", role: .destructive) {
                 delete(session: session)
@@ -283,7 +285,20 @@ struct HistoryView: View {
             Text("\(stats.label)统计")
                 .font(.title2)
                 .fontWeight(.bold)
-
+            HStack {
+                Image(systemName: "hourglass")
+                Text("总用时")
+                Spacer()
+                Text(stats.duration)
+            }
+            Divider().background(.white.opacity(0.5))
+            HStack {
+                Image(systemName: "dollarsign.circle")
+                Text("总花费")
+                Spacer()
+                Text(stats.cost)
+                    .fontWeight(.bold)
+            }
             if selectedMonth != nil && selectedYear != nil && !filteredSessions.isEmpty {
                 Button(action: exportToImage) {
                     HStack {
@@ -294,23 +309,7 @@ struct HistoryView: View {
                 }
                 .buttonStyle(.bordered)
                 .tint(.white.opacity(0.8))
-            }
-            
-            HStack {
-                Image(systemName: "hourglass")
-                Text("总用时")
-                Spacer()
-                Text(stats.duration)
-            }
-            
-            Divider().background(.white.opacity(0.5))
-
-            HStack {
-                Image(systemName: "dollarsign.circle")
-                Text("总花费")
-                Spacer()
-                Text(stats.cost)
-                    .fontWeight(.bold)
+                .padding(.top, 10)
             }
         }
         .foregroundColor(.white)
@@ -326,12 +325,20 @@ struct HistoryView: View {
                 .font(.headline)
                 .fontWeight(.bold)
                 .foregroundColor(Color(red: 28/255, green: 62/255, blue: 51/255))
-            
             Divider()
-            
             ForEach(sessionsGroupedByDay[day]!) { session in
                 sessionRowView(for: session)
-                    .onLongPressGesture {
+                    .background(longPressedSessionId == session.id ? Color(red: 220/255, green: 240/255, blue: 220/255) : Color.white)
+                    .cornerRadius(12)
+                    .onLongPressGesture(minimumDuration: 0.2, pressing: { isPressing in
+                        if isPressing {
+                            longPressedSessionId = session.id
+                        } else {
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                longPressedSessionId = nil
+                            }
+                        }
+                    }) {
                         sessionToDelete = session
                         showingDeleteAlert = true
                     }
