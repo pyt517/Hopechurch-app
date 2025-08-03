@@ -22,7 +22,7 @@ struct ReportView: View {
                 .font(.largeTitle.bold())
                 .foregroundColor(.black)
             Text("\(monthName) \(String(year))")
-                .font(.title2.bold())
+                .font(.title.bold())
                 .foregroundColor(.black)
                 .frame(maxWidth: .infinity, alignment: .center)
             

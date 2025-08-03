@@ -6,91 +6,360 @@ struct ContentView: View {
     @State private var alertTitle = ""
     @State private var alertMessage = ""
     @State private var showingManualEntry = false
+    @State private var refreshTrigger = false // 用于触发重新计算
+    
+    // Add state for notice content and editor presentation
+    @State private var noticeContent: String = ""
+    @State private var showingNoticeEditor = false
+    private let noticeKey = "userNoticeContent"
     
     /// The user can "Enter" if there is no currently active session (no session with a nil `leave_at`).
     private var canEnter: Bool {
         !sessions.contains { $0.leave_at == nil }
     }
     
+    // MARK: - Financial Calculations
+    
+    /// 账户总计：所有缴纳的费用 - 额外花销的费用
+    private var accountTotal: Double {
+        // 使用refreshTrigger来触发重新计算
+        _ = refreshTrigger
+        
+        // 从UserDefaults读取缴费记录
+        var totalPayments: Double = 0.0
+        if let data = UserDefaults.standard.data(forKey: "PaymentRecords"),
+           let paymentRecords = try? JSONDecoder().decode([PaymentRecord].self, from: data) {
+            totalPayments = paymentRecords.reduce(0) { $0 + $1.amount }
+        }
+        
+        // 从UserDefaults读取支出记录
+        var totalExpenses: Double = 0.0
+        if let data = UserDefaults.standard.data(forKey: "ExpenseRecords"),
+           let expenseRecords = try? JSONDecoder().decode([ExpenseRecord].self, from: data) {
+            totalExpenses = expenseRecords.reduce(0) { $0 + $1.amount }
+        }
+        
+        return totalPayments - totalExpenses
+    }
+    
+    /// 当月应付：月度使用统计算出的总费用
+    private var currentMonthPayable: Double {
+        let currentMonth = Calendar.current.component(.month, from: Date())
+        let currentYear = Calendar.current.component(.year, from: Date())
+        
+        let monthSessions = sessions.filter { session in
+            let sessionMonth = Calendar.current.component(.month, from: session.arrive_at)
+            let sessionYear = Calendar.current.component(.year, from: session.arrive_at)
+            return sessionMonth == currentMonth && sessionYear == currentYear
+        }
+        
+        let totalDurationSeconds = monthSessions.reduce(0) { $0 + ($1.duration ?? 0) }
+        let totalMinutes = totalDurationSeconds / 60
+        let fullHours = floor(totalMinutes / 60)
+        let remainingMinutes = totalMinutes.truncatingRemainder(dividingBy: 60)
+        
+        var roundedRemainderMinutes: Double = 0
+        if remainingMinutes > 0 {
+            if remainingMinutes <= 15 {
+                roundedRemainderMinutes = 15
+            } else if remainingMinutes <= 30 {
+                roundedRemainderMinutes = 30
+            } else if remainingMinutes <= 45 {
+                roundedRemainderMinutes = 45
+            } else {
+                roundedRemainderMinutes = 60
+            }
+        }
+        
+        let billableMinutes = (fullHours * 60) + roundedRemainderMinutes
+        let billableHours = billableMinutes / 60
+        return billableHours * 10.0 // 假设每小时10加元
+    }
+    
+    /// 当月余额：账户总计 - 当月应付
+    private var currentMonthBalance: Double {
+        return accountTotal - currentMonthPayable
+    }
+
+    // Add a new computed property for current month's usage count
+    private var currentMonthUsageCount: Int {
+        let currentMonth = Calendar.current.component(.month, from: Date())
+        let currentYear = Calendar.current.component(.year, from: Date())
+        
+        return sessions.filter { session in
+            let sessionMonth = Calendar.current.component(.month, from: session.arrive_at)
+            let sessionYear = Calendar.current.component(.year, from: session.arrive_at)
+            return sessionMonth == currentMonth && sessionYear == currentYear
+        }.count
+    }
+
+    private var currentMonthDateString: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy年M月"
+        formatter.locale = Locale(identifier: "zh_CN")
+        return formatter.string(from: Date())
+    }
+    
     var body: some View {
         NavigationStack {
             ZStack {
                 // Background Layer
-                VStack(spacing: 0) {
-                    Color(red: 28/255, green: 62/255, blue: 51/255) // Dark Green Header
-                        .frame(height: UIScreen.main.bounds.height * 0.35)
-                    Color(red: 242/255, green: 242/255, blue: 247/255) // Light Gray Body
-                }
-                .ignoresSafeArea()
+                Color(red: 229/255, green: 243/255, blue: 247/255) // Light Gray Background
+                    .ignoresSafeArea()
                 
                 // Content Layer
                 VStack(spacing: 0) {
-                    // Header
-                    VStack(alignment: .leading) {
-                        Text("HopeChurch")
-                            .font(.system(size: 34, weight: .bold))
-                            .foregroundColor(.white)
+                    // Top Header
+                    HStack {
+                        HStack(spacing: 8) {
+                            Circle()
+                                .fill(Color(red: 0/255, green: 150/255, blue: 136/255))
+                                .frame(width: 24, height: 24)
+                                .overlay(
+                                    Circle()
+                                        .fill(Color.white)
+                                        .frame(width: 8, height: 8)
+                                )
+                            Text("教堂乒乓球")
+                                .font(.system(size: 30, weight: .semibold))
+                                .foregroundColor(.black)
+                        }
                         
-                        Text("随时记录您的到来")
-                            .font(.system(size: 18))
-                            .foregroundColor(.white.opacity(0.8))
-                            .padding(.top, 4)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 30)
-                    .padding(.top, 20)
-
-                    Spacer()
-
-                    // Floating Card
-                    VStack(spacing: 20) {
-                        actionButton(
-                            title: "进入",
-                            icon: "arrow.right.to.line",
-                            backgroundColor: Color(red: 252/255, green: 122/255, blue: 87/255),
-                            action: handleEnter,
-                            disabled: !canEnter
-                        )
+                        Spacer()
                         
-                        actionButton(
-                            title: "离开",
-                            icon: "arrow.left.to.line",
-                            backgroundColor: Color(red: 88/255, green: 86/255, blue: 214/255),
-                            action: handleLeave,
-                            disabled: canEnter
-                        )
+                        HStack(spacing: 4) {
+                            NavigationLink(destination: MemberManagementView()) {
+                                HStack(spacing: 4) {
+                                    Text("会员管理")
+                                        .font(.system(size: 20,weight: .semibold))
+                                        .foregroundColor(.black)
+                                    Image(systemName: "person.circle")
+                                        .font(.system(size: 24, weight: .semibold))
+                                        .foregroundColor(.black)
+                                }
+                            }
+                        }
                     }
-                    .padding(30)
-                    .background(Color.white)
-                    .cornerRadius(30)
-                    .shadow(color: .black.opacity(0.1), radius: 20, x: 0, y: 5)
                     .padding(.horizontal, 20)
-                    .offset(y: -40) // 用固定偏移，避免屏幕高度依赖
+                    .padding(.top, 20)
+                    .padding(.bottom, 30)
 
-                    // Spacer to push bottom navigation down
+                    // Central Action Card
+                    VStack(spacing: 20) {
+                        // Main icon
+                        Circle()
+                            .fill(Color(red: 0/255, green: 150/255, blue: 136/255))
+                            .frame(width: 60, height: 60)
+                            .overlay(
+                                Circle()
+                                    .fill(Color.white)
+                                    .frame(width: 20, height: 20)
+                            )
+                        
+                        // Title and subtitle
+                        VStack(spacing: 8) {
+                            Text("准备开始对打")
+                                .font(.system(size: 24, weight: .bold))
+                                .foregroundColor(.black)
+                            
+                            Text("选择进入或离开球台")
+                                .font(.system(size: 16))
+                                .foregroundColor(.gray)
+                        }
+                        
+                        // Action buttons
+                        VStack(spacing: 12) {
+                            Button(action: handleEnter) {
+                                HStack {
+                                    Image(systemName: "play.fill")
+                                        .font(.system(size: 18, weight: .semibold))
+                                    Text("进入球台")
+                                        .font(.system(size: 18, weight: .semibold))
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 16)
+                                .background(Color(red: 0/255, green: 150/255, blue: 136/255))
+                                .foregroundColor(.white)
+                                .cornerRadius(12)
+                            }
+                            .disabled(!canEnter)
+                            .opacity(canEnter ? 1 : 0.5)
+                            
+                            Button(action: handleLeave) {
+                                HStack {
+                                    Image(systemName: "stop.fill")
+                                        .font(.system(size: 18, weight: .semibold))
+                                    Text("离开球台")
+                                        .font(.system(size: 18, weight: .semibold))
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 16)
+                                .background(Color.white)
+                                .foregroundColor(.red)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .stroke(Color.red, lineWidth: 1)
+                                )
+                            }
+                            .disabled(canEnter)
+                            .opacity(canEnter ? 0.5 : 1)
+                        }
+                    }
+                    .padding(40)
+                    .background(Color.white)
+                    .cornerRadius(20)
+                    .shadow(color: .black.opacity(0.05), radius: 10, x: 0, y: 2)
+                    .padding(.horizontal, 20)
+
                     Spacer()
+                    
+                    // Financial Summary Section
+                    VStack(spacing: 16) {
+                        // Section Header: "My Information"
+                        HStack {
+                            HStack(spacing: 8) {
+                                Image(systemName: "person") // Changed icon
+                                    .font(.system(size: 18))
+                                    .foregroundColor(.blue) // Changed color to blue to match "Notice"
+                                Text("我的信息") // Changed title
+                                    .font(.system(size: 18, weight: .semibold))
+                                    .foregroundColor(.black)
+                            }
+                            
+                            Spacer()
+                            
+                            NavigationLink(destination: PaymentDetailsView()) {
+                                Text("缴费详情 →")
+                                    .font(.system(size: 14))
+                                    .foregroundColor(.blue)
+                            }
+                        }
+                        
+                        // Temporary Notice Card
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                Image(systemName: "message.fill")
+                                    .font(.system(size: 14))
+                                    .foregroundColor(.blue)
+                                Text("临时通知")
+                                    .font(.system(size: 16, weight: .bold))
+                                    .foregroundColor(.blue)
+                            }
+                            Text(noticeContent)
+                                .font(.system(size: 15))
+                                .lineLimit(2)
+                                .truncationMode(.tail)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .padding()
+                        .background(Color.blue.opacity(0.08))
+                        .cornerRadius(12)
+                        .onTapGesture {
+                            withAnimation(.easeInOut) {
+                                showingNoticeEditor.toggle()
+                            }
+                        }
+
+                        // Inline Notice Editor
+                        if showingNoticeEditor {
+                            NoticeEditorView(
+                                initialContent: noticeContent,
+                                onSave: { newContent in
+                                    saveNotice(content: newContent)
+                                    withAnimation(.easeInOut) {
+                                        showingNoticeEditor = false
+                                    }
+                                },
+                                onCancel: {
+                                    withAnimation(.easeInOut) {
+                                        showingNoticeEditor = false
+                                    }
+                                }
+                            )
+                            .transition(.asymmetric(
+                                insertion: .scale(scale: 0.9, anchor: .top).combined(with: .opacity),
+                                removal: .scale(scale: 0.9, anchor: .top).combined(with: .opacity)
+                            ))
+                        }
+
+                        // Monthly Payable Card (existing orange card)
+                        VStack(spacing: 12) {
+                            HStack {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "calendar")
+                                        .font(.system(size: 16))
+                                        .foregroundColor(.orange)
+                                    Text(currentMonthDateString)
+                                        .font(.system(size: 16, weight: .medium))
+                                        .foregroundColor(.black.opacity(0.8))
+                                }
+                                Spacer()
+                                Text("\(currentMonthUsageCount) 次使用")
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundColor(.orange)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 6)
+                                    .background(Color.orange.opacity(0.15))
+                                    .cornerRadius(8)
+                            }
+                            
+                            Spacer()
+                            
+                            VStack(spacing: 4) {
+                                Text("¥\(currentMonthPayable, specifier: "%.0f")")
+                                    .font(.system(size: 40, weight: .bold))
+                                    .foregroundColor(.orange)
+                                Text("当月应付费用")
+                                    .font(.system(size: 14))
+                                    .foregroundColor(.gray)
+                            }
+                            
+                            Spacer()
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 150)
+                        .padding()
+                        .background(Color.orange.opacity(0.08)) // Set the fill color
+                        .cornerRadius(20) // Round the corners of the view and its background
+                        .overlay(
+                            // Add the border on top
+                            RoundedRectangle(cornerRadius: 20)
+                                .stroke(Color.orange.opacity(0.5), lineWidth: 1)
+                        )
+
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 20)
+                    .background(Color.white)
+                    .cornerRadius(20)
+                    .shadow(color: .black.opacity(0.05), radius: 10, x: 0, y: 2)
+                    .padding(.horizontal, 20)
+                    
+                    // Overlay for the Notice Editor
+                    // The `if showingNoticeEditor { ... }` overlay logic that was here is removed.
+                    
                     Spacer()
 
                     // Bottom Navigation
                     HStack {
-                        NavigationLink(destination: ManualEntryView(onSave: {
+                         NavigationLink(destination: ManualEntryView(onSave: {
                             loadInitialData()
-                        })) {
-                            VStack(spacing: 2) {
-                                Image(systemName: "square.and.pencil")
-                                    .font(.system(size: 22))
-                                Text("手动补卡")
-                                    .font(.footnote)
+                         })) {
+                            VStack(spacing: 4) {
+                                Image(systemName: "pencil")
+                                    .font(.system(size: 20))
+                                Text("手动补录")
+                                    .font(.system(size: 12))
                                     .fontWeight(.medium)
                             }
                             .frame(maxWidth: .infinity)
                         }
+                        
                         NavigationLink(destination: HistoryView(sessions: $sessions)) {
-                            VStack(spacing: 2) {
-                                Image(systemName: "clock.fill")
-                                    .font(.system(size: 22))
-                                Text("查看历史")
-                                    .font(.footnote)
+                            VStack(spacing: 4) {
+                                Image(systemName: "clock")
+                                    .font(.system(size: 20))
+                                Text("使用历史记录")
+                                    .font(.system(size: 12))
                                     .fontWeight(.medium)
                             }
                             .frame(maxWidth: .infinity)
@@ -98,40 +367,20 @@ struct ContentView: View {
                     }
                     .frame(maxWidth: .infinity, minHeight: 56)
                     .background(Color.white)
-                    .foregroundColor(Color(red: 28/255, green: 62/255, blue: 51/255))
+                    .foregroundColor(.black)
                     .ignoresSafeArea(edges: .bottom)
                 }
-                .padding(.top, 40)
             }
             .toolbar(.hidden, for: .navigationBar)
             .alert(isPresented: $showAlert) {
                 Alert(title: Text(alertTitle), message: Text(alertMessage), dismissButton: .default(Text("好的")))
             }
             .onAppear(perform: loadInitialData)
-        }
-        .navigationViewStyle(.stack) // 可选，NavigationStack下可移除
-    }
-    
-    // Custom Action Button
-    @ViewBuilder
-    private func actionButton(title: String, icon: String, backgroundColor: Color, action: @escaping () -> Void, disabled: Bool) -> some View {
-        Button(action: action) {
-            HStack {
-                Image(systemName: icon)
-                    .font(.title2.weight(.semibold))
-                Text(title)
-                    .font(.title2)
-                    .fontWeight(.bold)
+            .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
+                // 当应用回到前台时，触发重新计算
+                refreshTrigger.toggle()
             }
-            .frame(maxWidth: .infinity)
-            .padding()
-            .background(backgroundColor)
-            .foregroundColor(.white)
-            .cornerRadius(20)
         }
-        .disabled(disabled)
-        .opacity(disabled ? 0.5 : 1)
-        .animation(.easeInOut, value: disabled)
     }
     
     // --- Data Handlers ---
@@ -145,6 +394,16 @@ struct ContentView: View {
                 // Handle error appropriately
             }
         }
+        loadNotice() // Make sure to load the notice on app start
+    }
+    
+    private func loadNotice() {
+        noticeContent = UserDefaults.standard.string(forKey: noticeKey) ?? "本周六下午2点有乒乓球比赛，欢迎大家报名参加！"
+    }
+
+    private func saveNotice(content: String) {
+        UserDefaults.standard.set(content, forKey: noticeKey)
+        self.noticeContent = content
     }
     
     private func handleEnter() {
@@ -198,6 +457,11 @@ struct ManualEntryView: View {
     @State private var leaveDateComponent = Date()
     @State private var leaveTimeComponent = Date()
     
+    @State private var showingArriveDatePicker = false
+    @State private var showingArriveTimePicker = false
+    @State private var showingLeaveDatePicker = false
+    @State private var showingLeaveTimePicker = false
+    
     @State private var isAlertPresented = false
     @State private var alertTitle = ""
     @State private var alertMessage = ""
@@ -217,61 +481,263 @@ struct ManualEntryView: View {
 
     var body: some View {
         ZStack {
-            // Background Layer
-            VStack(spacing: 0) {
-                Color(red: 28/255, green: 62/255, blue: 51/255)
-                    .frame(height: 150)
-                Color(red: 242/255, green: 242/255, blue: 247/255)
-            }
-            .edgesIgnoringSafeArea(.all)
+            // Background
+            Color(red: 240/255, green: 249/255, blue: 255/255)
+                .ignoresSafeArea()
             
-            // Content Layer
-            VStack(alignment: .leading, spacing: 0) {
-                customNavBar()
+            VStack(spacing: 0) {
+                // Header
+                HStack {
+                    HStack(spacing: 8) {
+                        Image(systemName: "target")
+                            .font(.system(size: 20))
+                            .foregroundColor(Color(red: 0/255, green: 150/255, blue: 136/255))
+                        Text("手动补录使用时间")
+                            .font(.system(size: 20, weight: .bold))
+                            .foregroundColor(Color(red: 0/255, green: 150/255, blue: 136/255))
+                    }
+                    
+                    Spacer()
+                    
+                    Button(action: {
+                        dismiss()
+                    }) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 20, weight: .semibold))
+                            .foregroundColor(.black)
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 20)
+                .padding(.bottom, 30)
 
                 ScrollView {
                     VStack(spacing: 20) {
-                        // Entry Time Card
-                        VStack(alignment: .leading) {
+                        // Enter Table Time Card
+                        VStack(alignment: .leading, spacing: 16) {
                             Text("进入时间")
-                                .font(.headline)
-                                .padding([.top, .horizontal])
-                            Divider().padding(.horizontal)
-                            DatePicker("日期", selection: $arriveDateComponent, displayedComponents: .date)
-                                .padding([.horizontal])
-                            DatePicker("时间", selection: $arriveTimeComponent, displayedComponents: .hourAndMinute)
-                                .padding([.horizontal, .bottom])
+                                .font(.system(size: 20, weight: .bold))
+                                .foregroundColor(Color(red: 0/255, green: 150/255, blue: 136/255))
+                            
+                            VStack(alignment: .leading, spacing: 12) {
+                                // Date and Time Columns
+                                HStack(spacing: 12) {
+                                    // Date Column
+                                    VStack(alignment: .leading, spacing: 10) {
+                                        Text("日期")
+                                            .font(.system(size: 15, weight: .medium))
+                                            .foregroundColor(.black)
+                                        
+                                        Button(action: {
+                                            showingArriveDatePicker = true
+                                        }) {
+                                            HStack(spacing: 8) {
+                                                Image(systemName: "calendar")
+                                                    .font(.system(size: 16))
+                                                    .foregroundColor(Color(red: 0/255, green: 150/255, blue: 136/255))
+                                                Text(dateFormatter.string(from: arriveDateComponent))
+                                                    .font(.system(size: 15, weight: .medium))
+                                                    .foregroundColor(.black)
+                                                Spacer()
+                                                Image(systemName: "chevron.down")
+                                                    .font(.system(size: 12))
+                                                    .foregroundColor(.gray)
+                                            }
+                                            .frame(width: 130)
+                                            .padding(.horizontal, 14)
+                                            .padding(.vertical, 12)
+                                            .background(
+                                                RoundedRectangle(cornerRadius: 12)
+                                                    .fill(Color.white)
+                                                    .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
+                                            )
+                                        }
+                                        .sheet(isPresented: $showingArriveDatePicker) {
+                                            DatePicker("选择日期", selection: $arriveDateComponent, displayedComponents: .date)
+                                                .datePickerStyle(.wheel)
+                                                .presentationDetents([.height(300)])
+                                        }
+                                    }
+                                    
+                                    // Time Column
+                                    VStack(alignment: .leading, spacing: 10) {
+                                        Text("时间")
+                                            .font(.system(size: 15, weight: .medium))
+                                            .foregroundColor(.black)
+                                        
+                                        Button(action: {
+                                            showingArriveTimePicker = true
+                                        }) {
+                                            HStack(spacing: 8) {
+                                                Image(systemName: "clock")
+                                                    .font(.system(size: 16))
+                                                    .foregroundColor(Color(red: 0/255, green: 150/255, blue: 136/255))
+                                                Text(timeFormatter.string(from: arriveTimeComponent))
+                                                    .font(.system(size: 15, weight: .medium))
+                                                    .foregroundColor(.black)
+                                                Spacer()
+                                                Image(systemName: "chevron.down")
+                                                    .font(.system(size: 12))
+                                                    .foregroundColor(.gray)
+                                            }
+                                            .frame(width: 130)
+                                            .padding(.horizontal, 14)
+                                            .padding(.vertical, 12)
+                                            .background(
+                                                RoundedRectangle(cornerRadius: 12)
+                                                    .fill(Color.white)
+                                                    .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
+                                            )
+                                        }
+                                        .sheet(isPresented: $showingArriveTimePicker) {
+                                            DatePicker("选择时间", selection: $arriveTimeComponent, displayedComponents: .hourAndMinute)
+                                                .datePickerStyle(.wheel)
+                                                .presentationDetents([.height(300)])
+                                        }
+                                    }
+                                    
+                                    Spacer()
+                                }
+                            }
                         }
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 24)
                         .background(Color.white)
-                        .cornerRadius(20)
+                        .cornerRadius(12)
+                        .overlay(
+                            Rectangle()
+                                .fill(Color.blue)
+                                .frame(width: 4)
+                                .cornerRadius(2),
+                            alignment: .leading
+                        )
 
-                        // Exit Time Card
-                        VStack(alignment: .leading) {
+                        // Leave Table Time Card
+                        VStack(alignment: .leading, spacing: 16) {
                             Text("离开时间")
-                                .font(.headline)
-                                .padding([.top, .horizontal])
-                            Divider().padding(.horizontal)
-                            DatePicker("日期", selection: $leaveDateComponent, displayedComponents: .date)
-                                .padding([.horizontal])
-                            DatePicker("时间", selection: $leaveTimeComponent, displayedComponents: .hourAndMinute)
-                                .padding([.horizontal, .bottom])
+                                .font(.system(size: 20, weight: .bold))
+                                .foregroundColor(.red)
+                            
+                            VStack(alignment: .leading, spacing: 12) {
+                                // Date and Time Columns
+                                HStack(spacing: 12) {
+                                    // Date Column
+                                    VStack(alignment: .leading, spacing: 10) {
+                                        Text("日期")
+                                            .font(.system(size: 15, weight: .medium))
+                                            .foregroundColor(.black)
+                                        
+                                        Button(action: {
+                                            showingLeaveDatePicker = true
+                                        }) {
+                                            HStack(spacing: 8) {
+                                                Image(systemName: "calendar")
+                                                    .font(.system(size: 16))
+                                                    .foregroundColor(.red)
+                                                Text(dateFormatter.string(from: leaveDateComponent))
+                                                    .font(.system(size: 15, weight: .medium))
+                                                    .foregroundColor(.black)
+                                                Spacer()
+                                                Image(systemName: "chevron.down")
+                                                    .font(.system(size: 12))
+                                                    .foregroundColor(.gray)
+                                            }
+                                            .frame(width: 130)
+                                            .padding(.horizontal, 14)
+                                            .padding(.vertical, 12)
+                                            .background(
+                                                RoundedRectangle(cornerRadius: 12)
+                                                    .fill(Color.white)
+                                                    .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
+                                            )
+                                        }
+                                        .sheet(isPresented: $showingLeaveDatePicker) {
+                                            DatePicker("选择日期", selection: $leaveDateComponent, displayedComponents: .date)
+                                                .datePickerStyle(.wheel)
+                                                .presentationDetents([.height(300)])
+                                        }
+                                    }
+                                    
+                                    // Time Column
+                                    VStack(alignment: .leading, spacing: 10) {
+                                        HStack {
+                                            Text("时间")
+                                                .font(.system(size: 15, weight: .medium))
+                                                .foregroundColor(.black)
+                                            
+                                            Spacer()
+                                            
+                                            Text("Preview")
+                                                .font(.system(size: 12))
+                                                .foregroundColor(.gray)
+                                                .padding(.horizontal, 8)
+                                                .padding(.vertical, 2)
+                                                .background(Color.gray.opacity(0.2))
+                                                .cornerRadius(4)
+                                        }
+                                        
+                                        Button(action: {
+                                            showingLeaveTimePicker = true
+                                        }) {
+                                            HStack(spacing: 8) {
+                                                Image(systemName: "clock")
+                                                    .font(.system(size: 16))
+                                                    .foregroundColor(.red)
+                                                Text(timeFormatter.string(from: leaveTimeComponent))
+                                                    .font(.system(size: 15, weight: .medium))
+                                                    .foregroundColor(.black)
+                                                Spacer()
+                                                Image(systemName: "chevron.down")
+                                                    .font(.system(size: 12))
+                                                    .foregroundColor(.gray)
+                                            }
+                                            .frame(width: 130)
+                                            .padding(.horizontal, 14)
+                                            .padding(.vertical, 12)
+                                            .background(
+                                                RoundedRectangle(cornerRadius: 12)
+                                                    .fill(Color.white)
+                                                    .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
+                                            )
+                                        }
+                                        .sheet(isPresented: $showingLeaveTimePicker) {
+                                            DatePicker("选择时间", selection: $leaveTimeComponent, displayedComponents: .hourAndMinute)
+                                                .datePickerStyle(.wheel)
+                                                .presentationDetents([.height(300)])
+                                        }
+                                    }
+                                    
+                                    Spacer()
+                                }
+                            }
                         }
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 24)
                         .background(Color.white)
-                        .cornerRadius(20)
+                        .cornerRadius(12)
+                        .overlay(
+                            Rectangle()
+                                .fill(Color.red)
+                                .frame(width: 4)
+                                .cornerRadius(2),
+                            alignment: .leading
+                        )
                         
                         // Save Button
                         Button(action: saveSession) {
                             Text("保存记录")
-                                .font(.headline)
-                                .fontWeight(.bold)
+                                .font(.system(size: 18, weight: .bold))
                                 .frame(maxWidth: .infinity)
+                                .padding(.vertical, 16)
+                                .background(Color(red: 0/255, green: 150/255, blue: 136/255))
+                                .foregroundColor(.white)
+                                .cornerRadius(12)
                         }
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.large)
-                        .tint(Color(red: 28/255, green: 62/255, blue: 51/255))
                         .disabled(isSaveDisabled)
+                        .opacity(isSaveDisabled ? 0.5 : 1)
                     }
-                    .padding()
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 20)
                 }
             }
         }
@@ -286,28 +752,6 @@ struct ManualEntryView: View {
             )
         }
         .onAppear(perform: setupDefaultDates)
-    }
-    
-    @ViewBuilder
-    private func customNavBar() -> some View {
-        HStack {
-            Button(action: {
-                dismiss()
-            }) {
-                Image(systemName: "chevron.left")
-                    .font(.system(size: 22, weight: .semibold))
-                    .foregroundColor(.white)
-            }
-            Spacer()
-            Text("手动补卡")
-                .font(.system(size: 20, weight: .bold))
-                .foregroundColor(.white)
-            Spacer()
-            Image(systemName: "chevron.left").opacity(0)
-        }
-        .padding(.horizontal)
-        .padding(.top, 20)
-        .padding(.bottom, 10)
     }
 
     private func setupDefaultDates() {
@@ -367,9 +811,160 @@ struct ManualEntryView: View {
         }
     }
     
+    private var dateFormatter: DateFormatter {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "M月d日"
+        return formatter
+    }
+    
+    private var timeFormatter: DateFormatter {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm"
+        return formatter
+    }
+    
     private var dateTimeFormatter: DateFormatter {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy年M月d日 HH:mm"
         return formatter
+    }
+} 
+
+// Add the new NoticeEditorView struct
+struct NoticeEditorView: View {
+    @State private var content: String
+    let onSave: (String) -> Void
+    let onCancel: () -> Void
+    
+    let maxChars = 200
+
+    init(initialContent: String, onSave: @escaping (String) -> Void, onCancel: @escaping () -> Void) {
+        // If the initial content is the default placeholder, start with an empty editor.
+        if initialContent == "本周六下午2点有乒乓球比赛，欢迎大家报名参加！" {
+            _content = State(initialValue: "")
+        } else {
+            _content = State(initialValue: initialContent)
+        }
+        self.onSave = onSave
+        self.onCancel = onCancel
+    }
+
+    var body: some View {
+        // The ZStack wrapper and background dimming are removed.
+        // The root is now the VStack.
+        VStack(spacing: 0) {
+            // Header
+            HStack {
+                Image(systemName: "message.circle.fill")
+                    .font(.system(size: 20))
+                    .foregroundColor(Color(red: 0/255, green: 150/255, blue: 136/255))
+                Text("编辑临时通知")
+                    .font(.system(size: 20, weight: .bold))
+                Spacer()
+                Button(action: onCancel) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundColor(.gray)
+                        .padding(8)
+                        .background(Color.gray.opacity(0.15))
+                        .clipShape(Circle())
+                }
+            }
+            .padding()
+
+            // Content Editor
+            VStack(alignment: .leading, spacing: 8) {
+                Text("通知内容")
+                    .font(.system(size: 16, weight: .semibold))
+                
+                ZStack(alignment: .bottomTrailing) {
+                    TextEditor(text: $content)
+                        .font(.system(size: 16))
+                        .frame(height: 150)
+                        .onChange(of: content) { _, newValue in
+                            if newValue.count > maxChars {
+                                content = String(newValue.prefix(maxChars))
+                            }
+                        }
+                    
+                    // Placeholder
+                    if content.isEmpty {
+                        Text("输入临时通知内容...")
+                            .font(.system(size: 16))
+                            .foregroundColor(.gray.opacity(0.7))
+                            .padding(.top, 8)
+                            .padding(.leading, 5)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                            .allowsHitTesting(false)
+                    }
+
+                    // Character count
+                    Text("\(content.count)/\(maxChars)")
+                        .font(.system(size: 12))
+                        .foregroundColor(.gray)
+                        .padding(8)
+                }
+                .padding(12)
+                .background(Color.white)
+                .cornerRadius(12)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color(red: 0/255, green: 150/255, blue: 136/255).opacity(0.5), lineWidth: 2)
+                )
+            }
+            .padding(.horizontal)
+
+            // Info Box
+            HStack(spacing: 8) {
+                Image(systemName: "bell.fill")
+                    .foregroundColor(.blue)
+                Text("通知将显示在首页信息模块中")
+                    .font(.system(size: 14))
+                    .foregroundColor(.blue.opacity(0.8))
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.blue.opacity(0.1))
+            .cornerRadius(10)
+            .padding()
+            
+            // Action Buttons
+            HStack(spacing: 12) {
+                Button(action: onCancel) {
+                    HStack {
+                        Image(systemName: "xmark")
+                        Text("取消")
+                    }
+                    .font(.system(size: 16, weight: .bold))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(Color.white)
+                    .foregroundColor(.gray)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.gray.opacity(0.4), lineWidth: 1)
+                    )
+                    .cornerRadius(12)
+                }
+                
+                Button(action: { onSave(content) }) {
+                    HStack {
+                        Image(systemName: "square.and.arrow.down.fill")
+                        Text("保存")
+                    }
+                    .font(.system(size: 16, weight: .bold))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(Color(red: 0/255, green: 150/255, blue: 136/255))
+                    .foregroundColor(.white)
+                    .cornerRadius(12)
+                }
+            }
+            .padding(.horizontal)
+            .padding(.bottom)
+        }
+        .background(Color(red: 245/255, green: 249/255, blue: 252/255))
+        .cornerRadius(20)
+        .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 4)
     }
 } 

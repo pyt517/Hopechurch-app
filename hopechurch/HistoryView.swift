@@ -11,6 +11,8 @@ struct HistoryView: View {
     @State private var showingShareSheet = false
     @State private var reportImage: UIImage?
     @State private var longPressedSessionId: Int? = nil
+    @State private var showingYearPicker = false
+    @State private var showingMonthPicker = false
 
 
     // --- COMPUTED PROPERTIES: DATA ---
@@ -121,16 +123,37 @@ struct HistoryView: View {
     var body: some View {
         ZStack {
             // Background Layer
-            VStack(spacing: 0) {
-                Color(red: 28/255, green: 62/255, blue: 51/255) // Dark Green Header
-                    .frame(height: 150)
-                Color(red: 242/255, green: 242/255, blue: 247/255) // Light Gray Body
-            }
-            .ignoresSafeArea()
+            Color(red: 229/255, green: 243/255, blue: 247/255) // Light Gray Background
+                .ignoresSafeArea()
 
             // Content Layer
             VStack(alignment: .leading, spacing: 0) {
-                customNavBar()
+                // Header
+                HStack {
+                    // Title on the left
+                    HStack(spacing: 8) {
+                        Image(systemName: "clock")
+                            .font(.system(size: 20))
+                            .foregroundColor(Color(red: 0/255, green: 150/255, blue: 136/255))
+                        Text("历史记录")
+                            .font(.system(size: 20, weight: .bold))
+                            .foregroundColor(Color(red: 0/255, green: 150/255, blue: 136/255))
+                    }
+                    
+                    Spacer()
+                    
+                    // Close button on the right
+                    Button(action: {
+                        presentationMode.wrappedValue.dismiss()
+                    }) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 20, weight: .semibold))
+                            .foregroundColor(.black)
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 20)
+                .padding(.bottom, 10)
 
                 ScrollView {
                     VStack(spacing: 20) {
@@ -139,19 +162,41 @@ struct HistoryView: View {
                         if let stats = totalStatistics {
                             statisticsCardView(stats: stats)
                         }
+                        
+                        // Tip Card
+                        HStack(spacing: 12) {
+                            Image(systemName: "info.circle")
+                                .font(.system(size: 16))
+                                .foregroundColor(Color.blue.opacity(0.7))
+                            
+                            Text("长按日期即可删除记录")
+                                .font(.system(size: 14))
+                                .foregroundColor(.black)
+                            
+                            Spacer()
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+                        .background(Color.blue.opacity(0.1))
+                        .cornerRadius(12)
 
                         if filteredSessions.isEmpty && (selectedYear != nil) {
-                            Text("当前筛选条件下无记录")
-                                .foregroundColor(.secondary)
-                                .padding()
-                                .frame(maxWidth: .infinity)
-                                .background(Color.white)
-                                .cornerRadius(12)
-                                .shadow(color: .black.opacity(0.05), radius: 6, x: 0, y: 2)
-                        } else {
-                            ForEach(sortedDays, id: \.self) { day in
-                                dailySessionCard(day: day)
+                            VStack(spacing: 16) {
+                                Image(systemName: "target")
+                                    .font(.system(size: 48))
+                                    .foregroundColor(.gray)
+                                
+                                Text("该月份暂无对打记录")
+                                    .font(.system(size: 16))
+                                    .foregroundColor(.gray)
                             }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 40)
+                            .background(Color.white)
+                            .cornerRadius(20)
+                            .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
+                        } else {
+                            allSessionsCard()
                         }
                     }
                     .padding()
@@ -182,37 +227,11 @@ struct HistoryView: View {
     // --- VIEW BUILDERS ---
 
     @ViewBuilder
-    private func customNavBar() -> some View {
-        HStack {
-            Button(action: {
-                presentationMode.wrappedValue.dismiss()
-            }) {
-                Image(systemName: "chevron.left")
-                    .font(.system(size: 22, weight: .semibold))
-                    .foregroundColor(.white)
-            }
-            
-            Spacer()
-            
-            Text("历史记录")
-                .font(.system(size: 20, weight: .bold))
-                .foregroundColor(.white)
-            
-            Spacer()
-            
-            // A placeholder to keep the title centered
-            Image(systemName: "chevron.left").opacity(0)
-        }
-        .padding(.horizontal)
-        .padding(.top, 20)
-        .padding(.bottom, 10)
-    }
-
-    @ViewBuilder
     private func filterView() -> some View {
         VStack(alignment: .leading) {
             Text("筛选记录")
-                .font(.title3).bold()
+                .font(.headline).bold()
+                .foregroundColor(Color(red: 0/255, green: 150/255, blue: 136/255).opacity(1))
                 .padding([.horizontal, .top])
 
             HStack {
@@ -222,83 +241,142 @@ struct HistoryView: View {
             .padding([.horizontal, .bottom])
         }
         .background(Color.white)
-        .cornerRadius(20)
+        .cornerRadius(12)
     }
 
     @ViewBuilder
     private func yearPicker() -> some View {
-        Menu {
-            Button("所有年份") {
-                selectedYear = nil
-                selectedMonth = nil
+        Button(action: {
+            showingYearPicker = true
+        }) {
+            HStack {
+                Text(selectedYear == nil ? "所有年份" : "\(String(selectedYear!))年")
+                    .font(.system(size: 16))
+                    .foregroundColor(.black)
+                Spacer()
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 12))
+                    .foregroundColor(.gray)
             }
-            ForEach(availableYears, id: \.self) { year in
-                Button("\(String(year))年") {
-                    if selectedYear != year {
-                        selectedYear = year
-                        selectedMonth = nil
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .background(Color.white)
+            .cornerRadius(12)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(Color(red: 240/255, green: 249/255, blue: 255/255).opacity(1), lineWidth: 3)
+            )
+        }
+        .sheet(isPresented: $showingYearPicker) {
+            VStack {
+                HStack {
+                    Text("选择年份")
+                        .font(.headline)
+                        .padding()
+                    Spacer()
+                    Button("完成") {
+                        showingYearPicker = false
+                    }
+                    .padding()
+                }
+                
+                Picker("年份", selection: $selectedYear) {
+                    Text("所有年份").tag(nil as Int?)
+                    ForEach(availableYears, id: \.self) { year in
+                        Text("\(String(year))年").tag(year as Int?)
                     }
                 }
+                .pickerStyle(.wheel)
+                .presentationDetents([.height(300)])
             }
-        } label: {
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("年份").font(.caption).foregroundStyle(.secondary)
-                    Text(selectedYear == nil ? "所有" : "\(String(selectedYear!))").font(.headline)
-                }
-                Spacer()
-                Image(systemName: "chevron.down").font(.caption).foregroundStyle(.secondary)
-            }
-            .padding()
-            .background(Color.gray.opacity(0.1))
-            .cornerRadius(10)
         }
     }
     
     @ViewBuilder
     private func monthPicker() -> some View {
-        Menu {
-            Button("所有月份") { selectedMonth = nil }
-            ForEach(availableMonths, id: \.self) { month in
-                Button(monthName(from: month)) { selectedMonth = month }
-            }
-        } label: {
+        Button(action: {
+            showingMonthPicker = true
+        }) {
             HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("月份").font(.caption).foregroundStyle(.secondary)
-                    Text(selectedMonth == nil ? "所有" : monthName(from: selectedMonth!)).font(.headline)
-                }
+                Text(selectedMonth == nil ? "所有月份" : monthName(from: selectedMonth!))
+                    .font(.system(size: 16))
+                    .foregroundColor(.black)
                 Spacer()
-                Image(systemName: "chevron.down").font(.caption).foregroundStyle(.secondary)
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 12))
+                    .foregroundColor(.gray)
             }
-            .padding()
-            .background(Color.gray.opacity(0.1))
-            .cornerRadius(10)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .background(Color.white)
+            .cornerRadius(12)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(Color(red: 240/255, green: 249/255, blue: 255/255).opacity(1), lineWidth: 3)
+            )
         }
         .disabled(selectedYear == nil)
         .opacity(selectedYear == nil ? 0.6 : 1)
+        .sheet(isPresented: $showingMonthPicker) {
+            VStack {
+                HStack {
+                    Text("选择月份")
+                        .font(.headline)
+                        .padding()
+                    Spacer()
+                    Button("完成") {
+                        showingMonthPicker = false
+                    }
+                    .padding()
+                }
+                
+                Picker("月份", selection: $selectedMonth) {
+                    Text("所有月份").tag(nil as Int?)
+                    ForEach(availableMonths, id: \.self) { month in
+                        Text(monthName(from: month)).tag(month as Int?)
+                    }
+                }
+                .pickerStyle(.wheel)
+                .presentationDetents([.height(300)])
+            }
+        }
     }
 
     @ViewBuilder
     private func statisticsCardView(stats: (label: String, duration: String, cost: String)) -> some View {
         VStack(alignment: .leading, spacing: 15) {
-            Text("\(stats.label)统计")
-                .font(.title2)
-                .fontWeight(.bold)
             HStack {
-                Image(systemName: "hourglass")
-                Text("总用时")
-                Spacer()
-                Text(stats.duration)
-            }
-            Divider().background(.white.opacity(0.5))
-            HStack {
-                Image(systemName: "dollarsign.circle")
-                Text("总花费")
-                Spacer()
-                Text(stats.cost)
+                Image(systemName: "bolt")
+                    .font(.system(size: 18))
+                    .foregroundColor(.white)
+                Text("月度使用统计")
+                    .font(.title2)
                     .fontWeight(.bold)
             }
+            
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(stats.duration)
+                        .font(.system(size: 24, weight: .bold))
+                        .foregroundColor(.white)
+                    Text("使用时长")
+                        .font(.system(size: 14))
+                        .foregroundColor(.white.opacity(0.8))
+                }
+                
+                Spacer()
+                
+                VStack(alignment: .trailing, spacing: 4) {
+                    Text(stats.cost)
+                        .font(.system(size: 24, weight: .bold))
+                        .foregroundColor(.white)
+                    Text("总费用")
+                        .font(.system(size: 14))
+                        .foregroundColor(.white.opacity(0.8))
+                }
+            }
+            
+            // Export Button
             if selectedMonth != nil && selectedYear != nil && !filteredSessions.isEmpty {
                 Button(action: exportToImage) {
                     HStack {
@@ -306,44 +384,50 @@ struct HistoryView: View {
                         Text("导出为图片")
                     }
                     .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(Color.white)
+                    .foregroundColor(Color(red: 0/255, green: 150/255, blue: 136/255))
+                    .cornerRadius(12)
+                    .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
                 }
-                .buttonStyle(.bordered)
-                .tint(.white.opacity(0.8))
-                .padding(.top, 10)
             }
         }
         .foregroundColor(.white)
         .padding()
-        .background(Color(red: 91/255, green: 157/255, blue: 50/255))
+        .background(Color(red: 0/255, green: 150/255, blue: 136/255))
         .cornerRadius(20)
     }
 
     @ViewBuilder
-    private func dailySessionCard(day: Date) -> some View {
+    private func allSessionsCard() -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(day, style: .date)
-                .font(.headline)
-                .fontWeight(.bold)
-                .foregroundColor(Color(red: 28/255, green: 62/255, blue: 51/255))
-            Divider()
-            ForEach(sessionsGroupedByDay[day]!) { session in
-                sessionRowView(for: session)
-                    .background(longPressedSessionId == session.id ? Color(red: 220/255, green: 240/255, blue: 220/255) : Color.white)
-                    .cornerRadius(12)
-                    .onLongPressGesture(minimumDuration: 0.2, pressing: { isPressing in
-                        if isPressing {
-                            longPressedSessionId = session.id
-                        } else {
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            ForEach(sortedDays, id: \.self) { day in
+                VStack(alignment: .leading, spacing: 10) {
+                    Text(day, style: .date)
+                        .font(.headline)
+                        .fontWeight(.bold)
+                        .foregroundColor(longPressedSessionId == sessionsGroupedByDay[day]!.first?.id ? Color(red: 173/255, green: 216/255, blue: 230/255) : Color(red: 28/255, green: 62/255, blue: 51/255))
+                        .onLongPressGesture(minimumDuration: 1.0, pressing: { isPressing in
+                            if isPressing {
+                                longPressedSessionId = sessionsGroupedByDay[day]!.first?.id
+                            } else {
                                 longPressedSessionId = nil
                             }
+                        }) {
+                            sessionToDelete = sessionsGroupedByDay[day]!.first
+                            showingDeleteAlert = true
                         }
-                    }) {
-                        sessionToDelete = session
-                        showingDeleteAlert = true
+                    
+                    ForEach(sessionsGroupedByDay[day]!) { session in
+                        sessionRowView(for: session)
+                            .background(Color.white)
+                            .cornerRadius(12)
                     }
-                if session.id != sessionsGroupedByDay[day]!.last?.id {
+                }
+                
+                if day != sortedDays.last {
                     Divider()
+                        .padding(.vertical, 10)
                 }
             }
         }
